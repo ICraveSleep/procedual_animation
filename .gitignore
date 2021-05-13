@@ -74,7 +74,7 @@ crashlytics-build.properties
 #Visual Studio Code
 # Created by https://www.gitignore.io/api/visualstudiocode
 # Edit at https://www.gitignore.io/?templates=visualstudiocode
-
+/.vscode/
 ### VisualStudioCode ###
 .vscode/
 !.vscode/settings.json

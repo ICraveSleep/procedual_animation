@@ -1,0 +1,1 @@
+FABRIK paper: https://www.researchgate.net/figure/A-simple-example-of-Forward-and-Backward-Reaching-Inverse-Kinematics-for-the-case-where_fig15_271771862
