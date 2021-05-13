@@ -7,6 +7,7 @@ public class IK_dev : MonoBehaviour
 {
     public int chainLength = 2;
     public Transform target;
+    public Transform pole;
     
     [Header("Solver Parameters")]
     public int iterations = 10;
@@ -24,6 +25,14 @@ public class IK_dev : MonoBehaviour
     protected Vector3[] linkPositions;
     
 
+    // Correctly transfroming objects START
+    protected Vector3[] StartChildToParentDirections;
+    protected Quaternion[] StartRotationLinks;
+    protected Quaternion StartRotationTarget;  // Affects the rotation of the last link
+    protected Quaternion StartRotationBaseLink;
+    // Correctly transfroming objects END
+
+
     // Start is called before the first frame update
     void Awake() {
         Init();
@@ -33,6 +42,18 @@ public class IK_dev : MonoBehaviour
         links = new Transform[chainLength + 1];
         linkPositions = new Vector3[chainLength + 1];
         linkLengths = new float[chainLength];
+
+        // Correctly transfroming objects START
+        StartChildToParentDirections = new Vector3[chainLength + 1];
+        StartRotationLinks = new Quaternion[chainLength + 1];
+        
+        if (target == null){  // Not linked to correctly start rotations. Used to set a default target, if none are selected.
+            target = new GameObject(gameObject.name + "Target").transform;
+            target.position = transform.position;
+        }
+        StartRotationTarget = target.rotation;
+        // Correctly transfroming objects END
+
         totalLength = 0;
 
         Debug.Log("Number of 'links': " + links.Length);
@@ -41,12 +62,15 @@ public class IK_dev : MonoBehaviour
         var current = this.transform;    
         for (int i = links.Length-1; i>=0; i--){
             links[i] = current;
+            StartRotationLinks[i] = current.rotation;
 
             // When the base link is reached, no length can be extracted past that.
             if (i == links.Length-1){
-                // Do nothing
+                // End link
+                StartChildToParentDirections[i] = target.position - current.position; // NEW
             }
             else{
+                StartChildToParentDirections[i] = links[i + 1].position - current.position;
                 linkLengths[i] = (links[i+1].position - links[i].position).magnitude;
                 Debug.Log("d links: " + links[i+1].name + " and " + links[i].name + " = " + linkLengths[i]);
                 totalLength += linkLengths[i];
@@ -76,6 +100,9 @@ public class IK_dev : MonoBehaviour
         for(int i = 0; i < links.Length; i++){
             linkPositions[i] = links[i].position;
         }
+
+        var baseLinkRot = (links[0].parent != null) ? links[0].parent.rotation : Quaternion.identity;
+        var baseLinkRotDiff = baseLinkRot * Quaternion.Inverse(StartRotationBaseLink);
 
         //Checking if it is possible to reach the target TCP
         // Taking square for a faster computational check
@@ -117,8 +144,28 @@ public class IK_dev : MonoBehaviour
 
         }
 
-        //Set position
+        //Move towards pole
+        if (pole != null){
+            for (int i = 1; i < linkPositions.Length-1; i++){
+                var plane = new Plane(linkPositions[i+1] - linkPositions[i-1], linkPositions[i-1]);
+                var projectedPole = plane.ClosestPointOnPlane(pole.position);
+                var projectedLink = plane.ClosestPointOnPlane(linkPositions[i]);
+                var angle = Vector3.SignedAngle(projectedLink - linkPositions[i-1], projectedPole - linkPositions[i-1], plane.normal);
+                linkPositions[i] = Quaternion.AngleAxis(angle, plane.normal) * (linkPositions[i] - linkPositions[i-1]) + linkPositions[i-1];
+
+            }
+            
+        }
+
+        //Set position and rotation of links
         for(int i = 0; i < links.Length; i++){
+            if (i == linkPositions.Length - 1){
+                links[i].rotation = target.rotation * Quaternion.Inverse(StartRotationTarget) * StartRotationLinks[i];
+            }
+            else{
+                links[i].rotation = Quaternion.FromToRotation(StartChildToParentDirections[i], linkPositions[i+1] - linkPositions[i]) * StartRotationLinks[i];
+            }
+
             links[i].position = linkPositions[i];
         }
 
